@@ -25,11 +25,11 @@ https://github.com/imaginarydumpling/aws-bootcamp-cruddur-2023-clone/commit/f6cc
 
   - We will also create a ECS cluster using this commands       
     
-    ```
-	aws ecs create-cluster \
+```
+aws ecs create-cluster \
 --cluster-name cruddur \
 --service-connect-defaults namespace=cruddur
-    ```
+```
 
   - Results should show a created cluster in AWS ECS console called **cruddur**
 
