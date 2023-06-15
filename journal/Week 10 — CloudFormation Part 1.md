@@ -1,4 +1,4 @@
-# Week 10 — CloudFormation Part 1
+ # Week 10 — CloudFormation Part 1
 
 #### Business Use-case
   Package used AWS Services into CloudFormation Templates, this will allow us to modify easily our AWS services configurations which are divided into different stacks.
@@ -27,7 +27,7 @@ Parameters: Defines the input parameters that can be passed to the template when
 
 Resources: Defines the AWS resources that will be created and configured by the template. Here, the template creates the VPC, InternetGateway (IGW), VPCGatewayAttachment to attach the IGW to the VPC, RouteTable, RouteToIGW to route traffic to the IGW, and six subnets (three public and three private).
 
-Outputs: Specifies the values that will be returned after the stack is created. The outputs include VpcId, VpcCidrBlock, SubnetCidrBlocks, SubnetIds, and AvailabilityZones.
+Outputs: Specifies the values that will be returned after the stack is created, these can be cross-referenced to other stacks. The outputs include VpcId, VpcCidrBlock, SubnetCidrBlocks, SubnetIds, and AvailabilityZones.
 
 The template creates a VPC with the specified CIDR block, enables DNS hostnames and support, and assigns a name based on the stack's name. It creates an Internet Gateway and attaches it to the VPC. The template also creates a route table and adds a default route to the Internet Gateway.
 
@@ -91,7 +91,7 @@ PARAMETERS=$(cfn-toml params v2 -t $CONFIG_PATH): This command extracts the valu
 
 Finally, the aws cloudformation deploy command is used to deploy the CloudFormation stack. It specifies the stack name, template file path, region, S3 bucket, and other options like --no-execute-changeset (to review changes without executing them) and --capabilities CAPABILITY_NAMED_IAM (to acknowledge the creation of IAM resources).
 
-
+- End result should be the cluster created in ECS
 
 
 ### 3. Create the Service Stack
@@ -99,4 +99,39 @@ Finally, the aws cloudformation deploy command is used to deploy the CloudFormat
 ##### Context:
   1. This stack contains the configuration for the running of backend services in the ECS Fargate cluster.
 
-- 
+- This [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/6cc2095385fd76f3eb5ac941fecb0b36fb1a0871#diff-370a022e48cb18faf98122794ffc5ce775b2606b09a9d1f80b71333425ec078e) will install a cfn-toml in the gitpod.yml file. This will allow us to use the config.toml files added for each Cloud Formation Stack. Also created the necessay config.toml and service deploy script.
+
+
+FargateCluster: This resource creates an ECS cluster with Fargate capacity providers. It specifies the cluster name, capacity providers, and configuration options.
+
+ALB: This resource creates an Application Load Balancer (ALB) with IPv4 support. It is an internet-facing ALB with a specified name, security groups, and subnets.
+
+HTTPSListener: This resource creates an HTTPS listener for the ALB. It specifies the SSL certificate to be used, the default action to forward traffic to the frontend target group.
+
+HTTPListener: This resource creates an HTTP listener for the ALB. It redirects HTTP traffic to the HTTPS listener.
+
+ApiALBListenerRule: This resource creates a listener rule for the ALB that matches requests with the host header "api.thecloudproject.store" and forwards the traffic to the backend target group.
+
+ALBSG: This resource creates a security group for the ALB. It allows inbound traffic on ports 443 and 80 from any IP address.
+
+ServiceSG: This resource creates a security group for the Fargate services. It allows inbound traffic from the ALB security group on the specified backend port.
+
+BackendTG: This resource creates a target group for the backend services. It defines the health check settings and other properties.
+
+FrontendTG: This resource creates a target group for the frontend services. It defines the health check settings and other properties.
+
+The Outputs section defines values that are exported for reference or use in other stacks.
+
+The ClusterName output exports the name of the Fargate cluster.
+The ServiceSecurityGroupId output exports the security group ID for the Fargate services.
+The FrontendTGArn output exports the ARN (Amazon Resource Name) of the frontend target group.
+The BackendTGArn output exports the ARN of the backend target group.
+Overall, this CloudFormation template provisions the necessary resources to set up an ECS Fargate cluster with an ALB, target groups, and associated security groups for frontend and backend services.
+
+- End result should be the service stack running atop of the cluster stack with a task service deployed for the backend
+
+
+### 4. Create the RDS Stack
+
+##### Context:
+  - Create the RDS Stack via CFN
