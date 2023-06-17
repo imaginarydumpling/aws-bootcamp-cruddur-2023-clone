@@ -134,5 +134,112 @@ Overall, this CloudFormation template provisions the necessary resources to set 
 ### 4. Create the RDS Stack
 
 ##### Context:
-  - Create the RDS Stack via CFN
-  - 
+- Create the RDS Stack via CFN, this needs to be deployed first in order to connect the ECS stack to it and have the ECS services running properly.
+- [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/afb5871b2998773b35bdc450fcb065d040ffbbd4) creates a new folder called db with the files template.yaml for the cfn stack and the config.toml to reference the artifacts from the deploy bucket and the parameters needed to enable cross-stack referencing from other cfn stacks.
+
+Parameters: These are input parameters that can be customized when deploying the CloudFormation stack. The parameters include networking stack information, cluster stack information, backup retention period, RDS instance class, RDS instance identifier, database name, deletion protection, engine version, master username, and master user password.
+
+Resources:
+
+RDSPostgresSG: This resource creates an AWS EC2 security group for the PostgreSQL RDS instance. It allows inbound traffic on port 5432 (PostgreSQL default port) from the security group associated with the Fargate cluster.
+DBSubnetGroup: This resource creates an RDS DB subnet group. It specifies the group name, description, and the subnet IDs to be associated with the RDS instance. The subnet IDs are retrieved from the imported values of the networking stack's public subnets.
+Database: This is the main resource that creates the RDS PostgreSQL instance. It specifies various properties such as allocated storage, backup retention period, instance class, instance identifier, database name, subnet group, deletion protection, performance insights, engine (PostgreSQL), engine version, master username, master user password, and whether it should be publicly accessible. It also associates the RDS instance with the security group created earlier.
+Outputs (currently commented out): The outputs section defines the values that will be exported from the CloudFormation stack. In this case, it seems to be exporting the cluster name, but it's currently commented out.
+
+Overall, this CloudFormation template creates an RDS PostgreSQL database instance, sets up the necessary security groups and subnet groups, and configures various properties for the instance based on the provided parameters.
+
+- End result should be the cloudformation template changeset deployed properly and a new RDS instance is created in AWS RDS
+
+
+### 5. Create the DynamoDB Stack
+
+##### Context:
+- Create the DynamoDB Stack via SAM, SAM is mainly used for implementing deployments with serverless/lambda functions as they can package dependencies and libraries unlike CFN. 
+- In this [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/6bd6d60563ea6b0bcf9d1bca8ed1bf1638f33b8f#diff-370a022e48cb18faf98122794ffc5ce775b2606b09a9d1f80b71333425ec078e), the aws-sam will be installed whenever the workspace is in use.
+- In this [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/6bd6d60563ea6b0bcf9d1bca8ed1bf1638f33b8f#diff-b1ab1a6b3b41fe05789320a94f69d7adc956e46a30006395d431265d3e389c1e) We also added a new folder in ./aws/cfn/ddb and create a file called config.toml, added the necessary deploy variables for the s3 bucket name, region and stack name for the ddb cfn template. Parameters are also defined here as cross-referencing other variables from other cfn stacks will be used here.
+
+- Parameters: These are input parameters that can be customized when deploying the CloudFormation stack. The parameters include the Python runtime version, memory size for the Lambda function, timeout for the function, and deletion protection flag.
+
+Resources:
+
+DynamoDBTable: This resource creates a DynamoDB table with the specified attributes, key schema, provisioned throughput, billing mode, and global secondary index. It also enables deletion protection based on the value of the DeletionProtectionEnabled parameter and sets the stream specification to capture new images.
+ProcessDynamoDBStream: This resource creates a Lambda function using the AWS Serverless Application Model (SAM). It specifies the code location, package type, handler function, runtime, role, memory size, and timeout. The function is triggered by the DynamoDB stream from the previously created table. It processes the stream events in batches of 1 and starts from the latest record.
+LambdaLogGroup: This resource creates a CloudWatch Logs log group for the Lambda function's logs. It sets the log group name and retention period.
+LambdaLogStream: This resource creates a CloudWatch Logs log stream within the previously created log group. It sets the log group name and log stream name.
+ExecutionRole: This resource creates an IAM role for the Lambda function. It specifies the role name, trust policy allowing Lambda to assume the role, and permissions for CloudWatch Logs, network interfaces, Lambda function invocation, and DynamoDB stream operations.
+
+The CloudFormation template sets up a DynamoDB table, creates a Lambda function to process the table's stream, and configures the necessary IAM role and logging resources.
+
+- Additional changes in the template are founded in this [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/e66631cd5f7983a8e60a25b8eaf94257b8e8b832#diff-390c3544b998cb6ea7f87d52af8ec18f16c6549110538872ff09dcf7354f3197)
+- The config.toml file will be different to serve the SAM created template in this [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/e66631cd5f7983a8e60a25b8eaf94257b8e8b832#diff-d0a1ff02075a62655d790cb4d34a4cd570672db476eb2466e787b2c90630e951)
+- Also in this [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/e66631cd5f7983a8e60a25b8eaf94257b8e8b832), the whole scripts for ddb deployments are restructured and put into the root path to make running the scripts easier. A **ddb-deploy** script is created and this will build the lambda (**cruddur-messaging-streams**) and package the template.yaml referenced in the file and output it in the directory which in this case is **/workspace/aws-bootcamp-cruddur-2023/.aws-sam/build/packaged.yaml**
+- End result should be a lambda function deployed AWS Lambda with the packaged code.
+
+
+### 5. Create the CI/CD Stack
+
+##### Context:
+- Create the CICD Stack via CFN templates
+- This [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/23896a5c43320af17b13a1c21e46e0187cb4a467) emphasize on creating the template.yaml and config.toml in the respective aws/cfn/cicd folder. A deploy script is also created [here](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/23896a5c43320af17b13a1c21e46e0187cb4a467#diff-d345ca7b8bcc9b0f87d7f9d3fb8b4ca1017c25f5363bedff96273c3e2f4e9f60)
+
+**- The template.yaml does this:**
+
+Defines parameters for the GitHub branch, GitHub repository, cluster stack, service stack, and artifact bucket name.
+
+Creates a nested CloudFormation stack (CodeBuildBakeImageStack) using the template located at nested/codebuild.yaml. This stack is responsible for building the container image used in the deployment process.
+Creates an AWS CodeStar Connections connection (CodeStarConnection) for connecting to GitHub as the source provider.
+Creates an AWS CodePipeline (Pipeline) with three stages: Source, Build, and Deploy.
+The Source stage retrieves the application source code from the GitHub repository specified in the parameters and stores it as a code ZIP artifact in the specified artifact bucket.
+The Build stage uses AWS CodeBuild to build the container image using the source code artifact from the Source stage. The CodeBuild project name is obtained from the CodeBuildBakeImageStack stack outputs.
+The Deploy stage deploys the built container image to an Amazon ECS cluster and service. The cluster and service names are obtained by importing their values from the specified stack outputs (ClusterStack and ServiceStack).
+Creates an IAM role (CodePipelineRole) with policies that grant necessary permissions for the CodePipeline to interact with various AWS services, including ECS, CodeStar Connections, S3, CloudFormation, and IAM itself. These policies allow actions like describing services and task definitions, updating services, using CodeStar Connections, accessing S3 buckets, and managing IAM roles and policies.
+The EcsDeployPolicy grants permissions specific to ECS deployment operations.
+The CodeStarPolicy grants permissions to use the CodeStar Connections connection.
+The CodePipelinePolicy grants permissions required for CodePipeline operations.
+The CodePipelineBuildPolicy grants permissions to start, stop, and retry CodeBuild projects.
+
+Overall, this CloudFormation template automates the deployment process of a serverless application by setting up a CodePipeline with source code retrieval from GitHub, container image building using CodeBuild, and deployment to an ECS cluster and service.
+
+**- While the codebuild.yaml file does this:**
+
+The codebuild.yaml CloudFormation template sets up an AWS CodeBuild project for building container images. Here's what it does:
+
+Defines parameters for the log group path, log stream name, CodeBuild image, compute type, timeout duration, and build specification.
+Creates an AWS CodeBuild project (CodeBuild) with the specified properties:
+QueuedTimeoutInMinutes: Sets the maximum number of minutes a build is allowed to be queued before it times out.
+ServiceRole: Specifies the IAM role used by the CodeBuild project.
+Artifacts: Defines the type of artifacts produced by the build. In this case, it is set to CODEPIPELINE since it is used in a CodePipeline.
+Environment: Specifies the environment settings for the build. It includes the compute type, the CodeBuild image to use, the container type (Linux in this case), and enables privileged mode for building Docker images.
+LogsConfig: Configures the logging settings for the build, including the CloudWatch Logs group, stream name, and enabling status.
+Source: Defines the source type as CODEPIPELINE and specifies the build specification file to use.
+Creates an IAM role (CodeBuildRole) for the CodeBuild project with the necessary policies:
+ECRPolicy: Grants permissions related to Amazon Elastic Container Registry (ECR) operations, such as checking layer availability, uploading images, and retrieving images.
+VPCPolicy: Grants permissions related to Amazon EC2 VPC operations, such as creating and deleting network interfaces, describing subnets and security groups, and managing network interface permissions.
+Logs: Grants permissions related to AWS CloudWatch Logs operations, such as creating log groups, streams, and putting log events.
+Defines an output (CodeBuildProjectName) that provides the name of the CodeBuild project created.
+
+Overall, this template creates an AWS CodeBuild project with the specified configuration, allowing you to build container images as part of your deployment process.
+
+- End result should have a CICD deployed in AWS Codepipeline
+
+
+### 6. Create the Frontend Stack deployed in s3
+
+##### Context:
+- Deploy our Frontend in s3 instead of ECS as to save cost, this will be packaged in a cloudformation template that can help us configure it faster.
+- This [commit](https://github.com/aynfrancesco06/aws-bootcamp-cruddur-2023/commit/d46bfe10e713e4267901ce2433e0b100f8ce2c51) encapsulates everything that are needed to be created to execute the cloudformation frontend stack.
+- config.toml is created with deploy and parameter variables indicated in the file.
+- template.yaml is also created here which contains:
+
+Parameters section defines input parameters for the template, including CertificateArn (ARN of an ACM certificate), WwwBucketName (name of the S3 bucket for the www subdomain), and RootBucketName (name of the S3 bucket for the root domain).
+Resources section contains the resource definitions:
+RootBucketPolicy is an AWS::S3::BucketPolicy resource that sets a bucket policy allowing public read access to objects in the root S3 bucket.
+WWWBucket is an AWS::S3::Bucket resource for the www subdomain, which redirects all requests to the root domain.
+RootBucket is an AWS::S3::Bucket resource for the root domain, which serves as the main bucket for hosting the static website.
+RootBucketDomain and WwwBucketDomain are AWS::Route53::RecordSet resources that define DNS records for the root domain and www subdomain, respectively. They use AliasTarget to route traffic to the CloudFront distribution.
+Distribution is an AWS::CloudFront::Distribution resource that sets up a CloudFront distribution for the website. It specifies the aliases (root domain and www subdomain), comment, enabled status, HTTP version, default root object, origin (S3 bucket), cache behavior, and SSL certificate.
+Overall, this template creates an S3 bucket for the root domain and www subdomain, sets up DNS records using Route 53, and creates a CloudFront distribution for serving the static website content. The ACM certificate is used to enable HTTPS for the CloudFront distribution.
+
+- Also added a deploy script for the frontend cfn stack which is similar to other scripts aside from the PATH names and naming schemes for the stack.
+
+- End result should be an s3 bucket deployed which contain all our frontend assets. 
