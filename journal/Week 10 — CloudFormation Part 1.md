@@ -243,3 +243,8 @@ Overall, this template creates an S3 bucket for the root domain and www subdomai
 - Also added a deploy script for the frontend cfn stack which is similar to other scripts aside from the PATH names and naming schemes for the stack.
 
 - End result should be an s3 bucket deployed which contain all our frontend assets. 
+
+
+### 7. Diagramming
+
+- Diagrams for the whole architecture is in here [commit](https://app.diagrams.net/#G1q1rdz945yI0c-nALXfPEGpcrhY-eNh_b)
